@@ -1,6 +1,4 @@
-import { config } from "./config.js";
-
-const APIKEY = config.apiKey;
+import * as api from "./api.js";
 
 const date = document.getElementById('date');
 const form = document.getElementById('form');
@@ -40,6 +38,100 @@ function checkString(str) {
   return /^[A-Za-z\s]*$/.test(str);
 }
 
+async function renderWeather(data, city) {
+  let weatherData = await data;
+  let cityName = await city;
+
+  cityHtml.textContent = `${cityName[0].name}`;
+  image.src = `/images/${weatherData.weather[0].main.toLowerCase()}.png`;
+  weather.textContent = `${weatherData.weather.main}`;
+  temperature.textContent = `${weatherData.main.temp}°`;
+  minMax.textContent = `max ${weatherData.main.temp_max}° - min ${weatherData.main.temp_min}°`;
+  weather.textContent = weatherData.weather[0].main;
+  clouds.textContent = `clouds ${weatherData.clouds.all}%`;
+}
+
+async function renderForecast(data) {
+  let forecast = await data;
+
+  let daysarray = forecast.list.filter((times) => times.dt_txt.split(' ')[1] === '00:00:00');
+
+  let fiveDaysList = daysarray.map((element) => {
+  let card = document.createElement('div');
+  card.classList.add('card');
+
+  let dayNumber = new Date(element.dt_txt).getDay();
+
+    card.innerHTML = `
+      <div class="day-container-five">
+        <p class="day">${returnDay(dayNumber)}</p>
+      </div>
+      <div class="icon-container-five">
+        <img class="images" src="/images/${element.weather[0].main.toLowerCase()}.png">
+      </div>
+      <div class="temperature-container-five">
+        <p class="temperature-five">${element.main.temp.toFixed(1)}°</p>
+      </div>
+    `;
+
+    return card;
+    })
+
+    const cardsContainer = document.getElementById('cards-container');
+
+    if(cardsContainer !== ''){
+    cardsContainer.innerHTML = '';
+    }
+
+    fiveDaysList.forEach(element => {
+    cardsContainer.append(element);
+
+    document.getElementById('five-days').classList.remove('hide');
+  });
+}
+
+// Getting user geolocation if exists
+if(navigator.geolocation) {
+  //Getting the user location coordinates
+  const successCallback = async (position) => {
+    let lat = position.coords.latitude;
+    let lon = position.coords.longitude;
+    
+    //Getting weather info from api module
+    let weather = api.getWeatherData(lat, lon);
+    let forecast = api.getForecastData(lat, lon);
+    let cityName = api.getCityName(lat, lon);
+
+    renderWeather(weather, cityName);
+    renderForecast(forecast);
+  };
+
+  const errorCallback = () => {
+    document.getElementById('main').hidden = true;
+    document.getElementById('five-days').classList.add('hide');
+  };
+
+  navigator.geolocation.getCurrentPosition(successCallback, errorCallback);
+}
+
+async function getCityInfo(data) {
+  let info = await data;
+  
+  try{
+    let lat = info[0].lat;
+    let lon = info[0].lon;
+    let cityName = info;
+
+    let weather = api.getWeatherData(lat, lon);
+    let forecast = api.getForecastData(lat, lon);
+
+    renderWeather(weather, cityName);
+    renderForecast(forecast);
+  }catch{
+    displayAlert();
+  }
+}
+
 function displayAlert() {
   alert.style.removeProperty('display');
 
@@ -48,60 +140,13 @@ function displayAlert() {
   })
 }
 
-//Getting weather info
-function setWeather(lat, lon) {
-  const URL = `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&appid=${APIKEY}&units=metric`;
+function getUserInput(event){
+  let userInput = input.value;
 
-  // Getting weather info
-  fetch(URL)
-    .then(response => response.json())
-    .then(json => {
-      return json;
-    }).then((json) => {
-      const URLCITY = `http://api.openweathermap.org/geo/1.0/reverse?lat=${lat}&lon=${lon}&limit=5&appid=${APIKEY}`;
+  if(checkString(userInput) === true){
+    let city = api.getCityInfo(userInput);
 
-      //Getting the city name
-      fetch(URLCITY)
-        .then(response => response.json())
-        .then(json => {
-          return json;
-        }).then((json) => {
-          //Displaying the city name in the DOM
-          cityHtml.textContent = `${json[0].name}, ${json[0].country.toLowerCase()}`;
-        })
-      
-      //Displaying the data in the DOM
-      image.src = `/images/${json.weather[0].main.toLowerCase()}.png`;
-      temperature.textContent = `${json.main.temp}°`;
-      minMax.textContent = `max ${json.main.temp_max}° - min ${json.main.temp_min}°`;
-      weather.textContent = json.weather[0].main;
-      clouds.textContent = `clouds ${json.clouds.all}%`;
-    });
-
-    document.getElementById('main').hidden = false;
-}
-
-//Getting the coordinates from the user input city name
-function getCoordinates(event){
-  //Get the city name from the user input
-  let city = input.value;
-
-  if(checkString(city) === true){
-    const URLCOORDS = `http://api.openweathermap.org/geo/1.0/direct?q=${city}&appid=${APIKEY}`;
-
-    fetch(URLCOORDS)
-      .then(response => response.json())
-      .then(json => {
-        return json[0]
-      }).then((coords) => {
-        let lat = coords.lat;
-        let lon = coords.lon;
-
-        setWeather(lat, lon);
-        setForecast(lat, lon);
-      }).catch(() => {
-        displayAlert();
-      });
+    getCityInfo(city);
   } else {
     displayAlert();
   }
@@ -110,65 +155,4 @@ function getCoordinates(event){
   event.preventDefault();
 }
 
-//Getting the 5 days forecast
-function setForecast(lat, lon) {
-  const URLFORECAST = `http://api.openweathermap.org/data/2.5/forecast?lat=${lat}&lon=${lon}&appid=${APIKEY}&units=metric`;
-
-  fetch(URLFORECAST)
-    .then(response => response.json())
-    .then(json => {
-      let daysarray = json.list.filter((times) => times.dt_txt.split(' ')[1] === '00:00:00');
-
-      let fiveDaysList = daysarray.map((element) => {
-         let card = document.createElement('div');
-         card.classList.add('card');
-
-         let dayNumber = new Date(element.dt_txt).getDay();
-
-         card.innerHTML = `
-           <div class="day-container-five">
-             <p class="day">${returnDay(dayNumber)}</p>
-           </div>
-           <div class="icon-container-five">
-             <img class="images" src="/images/${element.weather[0].main.toLowerCase()}.png">
-           </div>
-           <div class="temperature-container-five">
-             <p class="temperature-five">${element.main.temp.toFixed(1)}°</p>
-           </div>
-         `;
-
-         return card;
-      })
-
-      const cardsContainer = document.getElementById('cards-container');
-
-      if(cardsContainer !== ''){
-        cardsContainer.innerHTML = '';
-      }
-
-      fiveDaysList.forEach(element => {
-        cardsContainer.append(element);
-      });
-    })
-
-  document.getElementById('five-days').classList.remove('hide');
-}
-
-form.addEventListener('submit', getCoordinates);
-
-//Getting the user location coordinates
-const successCallback = (position) => {
-  let lat = position.coords.latitude;
-  let lon = position.coords.longitude;
-  
-  // Displaying forecast info
-  setWeather(lat, lon);
-  setForecast(lat, lon);
-};
-
-const errorCallback = () => {
-  document.getElementById('main').hidden = true;
-  document.getElementById('five-days').classList.add('hide');
-};
-
-navigator.geolocation.getCurrentPosition(successCallback, errorCallback);
+form.addEventListener('submit', getUserInput);

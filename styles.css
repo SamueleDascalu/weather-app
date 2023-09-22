@@ -124,6 +124,8 @@ main{
   align-items: center;
   width: max-content;
   margin-bottom: 1rem;
+  border: 1px solid #4682B4;
+  border-radius: 5px;
 }
 
 #image{
@@ -225,7 +227,7 @@ hr{
     font-size: 70px;
   }
   #image{
-    width:max-content;
+    width: 80%;
     margin-right: 1rem;
   }
   #five-days{
