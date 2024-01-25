@@ -49,6 +49,8 @@ async function renderWeather(data, city) {
   minMax.textContent = `max ${weatherData.main.temp_max}° - min ${weatherData.main.temp_min}°`;
   weather.textContent = weatherData.weather[0].main;
   clouds.textContent = `clouds ${weatherData.clouds.all}%`;
+
+  document.getElementById('main').hidden = false;
 }
 
 async function renderForecast(data) {
